@@ -1,0 +1,2 @@
+
+-DCATKIN_DEVEL_PREFIX=/home/andreafinazzi/Documents/robotics-2019/devel -DCMAKE_INSTALL_PREFIX=/home/andreafinazzi/Documents/robotics-2019/install -G Unix Makefiles
