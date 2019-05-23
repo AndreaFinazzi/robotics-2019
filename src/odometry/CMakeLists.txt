@@ -7,8 +7,7 @@ project(odometry)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-
-find_package(catkin REQUIRED COMPONENTS message_generation)
+find_package(catkin REQUIRED COMPONENTS roscpp message_generation custom_messages message_filters)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -40,6 +39,8 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
 
   message_generation
+
+  message_filters
 
 )
 ##   * add "message_runtime" and every package in MSG_DEP_SET to
@@ -109,6 +110,7 @@ catkin_package(
 
   CATKIN_DEPENDS
   message_runtime
+  message_filters
 #  INCLUDE_DIRS include
 #  LIBRARIES odometry
 #  CATKIN_DEPENDS other_catkin_pkg
@@ -210,5 +212,14 @@ add_executable(odometry_node
 )
 add_dependencies(odometry_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(odometry_node
+  ${catkin_LIBRARIES}
+)
+
+
+add_executable(od_node
+  src/od_node.cpp
+)
+add_dependencies(od_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(od_node
   ${catkin_LIBRARIES}
 )
