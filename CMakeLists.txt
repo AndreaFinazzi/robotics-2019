@@ -214,12 +214,3 @@ add_dependencies(odometry_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPO
 target_link_libraries(odometry_node
   ${catkin_LIBRARIES}
 )
-
-
-add_executable(od_node
-  src/od_node.cpp
-)
-add_dependencies(od_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(od_node
-  ${catkin_LIBRARIES}
-)
