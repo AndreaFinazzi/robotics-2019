@@ -19,6 +19,10 @@
 #define STEERING_FACTOR 18
 #define PI 3.14159265
 
+#define SPEED_L_TOPIC "speedL_stamped"
+#define SPEED_R_TOPIC "speedR_stamped"
+#define STEER_TOPIC "steer_stamped"
+
 
 
 typedef struct odometry_data{
@@ -65,7 +69,6 @@ void ackermanDriveOdometry(double dt, double speed_L, double speed_R, double ste
     }
 }
 
-
 void subCallback(const odometry::floatStamped::ConstPtr& left,
                  const odometry::floatStamped::ConstPtr& right, 
                  const odometry::floatStamped::ConstPtr& steer){
@@ -76,18 +79,20 @@ void subCallback(const odometry::floatStamped::ConstPtr& left,
 
 int main(int argc, char *argv[])
 {
+
     OdometryData odometry;
     odometry.x = 0;
     odometry.y = 0;
     odometry.theta = 0;
     double last_msg_time = 0.0;
 
-    ros::init(argc, argv, "od_node");
+    ros::init(argc, argv, "odometry_node");
+
     ros::NodeHandle nh;
     std::cout << "Node started...\n";
-    message_filters::Subscriber<odometry::floatStamped> left_speed_sub(nh, "speedL_stamped", 1);
-    message_filters::Subscriber<odometry::floatStamped> right_speed_sub(nh, "speedR_stamped", 1);
-    message_filters::Subscriber<odometry::floatStamped> steer_sub(nh, "steer_stamped", 1);
+    message_filters::Subscriber<odometry::floatStamped> left_speed_sub(nh, SPEED_L_TOPIC, 1);
+    message_filters::Subscriber<odometry::floatStamped> right_speed_sub(nh, SPEED_R_TOPIC, 1);
+    message_filters::Subscriber<odometry::floatStamped> steer_sub(nh, STEER_TOPIC, 1);
 
     typedef message_filters::sync_policies::ApproximateTime<odometry::floatStamped, odometry::floatStamped, odometry::floatStamped> syncPolicy;
 
