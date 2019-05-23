@@ -11,6 +11,10 @@
 
 #include <dynamic_reconfigure/server.h>
 #include <odometry/parametersConfig.h>
+ 
+ // Output-related libraries
+#include <tf/transform_broadcaster.h>
+#include <nav_msgs/Odometry.h>
 
 //#include "custom_messages/floatStamped.h"
 #include "odometry/floatStamped.h"
@@ -40,8 +44,6 @@ typedef struct diff_drive_control_variables{
 using namespace std;
 OdometryData odom;
 double last_msg_time;
-
-
 
 void configChangeCallback(odometry::parametersConfig& config, uint32_t level) {
     ROS_INFO("Reconfigure Request: %s",
@@ -92,9 +94,48 @@ void ackermanDriveOdometry(double dt, double speed_L, double speed_R, double ste
     }
 }
 
+nav_msgs::Odometry populateOdometry() {
+    
+    nav_msgs::Odometry odometry;
+    odometry.header.stamp = ros::Time::now();
+    odometry.header.frame_id = "odometry";
+
+    //TODO: these should be set with calculated values
+    // position
+    odometry.pose.pose.position.x = 1;
+    odometry.pose.pose.position.y = 2;
+    odometry.pose.pose.position.z = 0.0;
+    odometry.pose.pose.orientation = tf::createQuaternionMsgFromYaw(123.4);
+
+    //set velocity
+    odometry.child_frame_id = "base_link";
+    odometry.twist.twist.linear.x = 0.5;
+    odometry.twist.twist.linear.y = 0.5;
+    odometry.twist.twist.angular.z = 123.4;
+
+    return odometry;
+}
+
+geometry_msgs::TransformStamped populateTransform() {
+    geometry_msgs::TransformStamped odometry_transform;
+    odometry_transform.header.stamp = ros::Time::now();
+    odometry_transform.header.frame_id = "odometry";
+    odometry_transform.child_frame_id = "base_link";
+
+    //TODO: these should be set with calculated values
+    odometry_transform.transform.translation.x = 1;
+    odometry_transform.transform.translation.y = 2;
+    odometry_transform.transform.translation.z = 0.0;
+    odometry_transform.transform.rotation = tf::createQuaternionMsgFromYaw(123.4);
+
+    return odometry_transform;
+}
+
 void subCallback(const odometry::floatStamped::ConstPtr& left,
                  const odometry::floatStamped::ConstPtr& right, 
-                 const odometry::floatStamped::ConstPtr& steer){
+                 const odometry::floatStamped::ConstPtr& steer,
+                 tf::TransformBroadcaster& broadcaster,
+                 ros::Publisher& publisher){
     double time = (left->header.stamp.toSec() + right->header.stamp.toSec() + steer->header.stamp.toSec()) / 3;
     double dt = time - last_msg_time;
     last_msg_time = time;
@@ -102,6 +143,13 @@ void subCallback(const odometry::floatStamped::ConstPtr& left,
     differenrialDriveOdometry(dt, left->data, right->data, odom, &storageStruct);
     odom = storageStruct;
     ROS_INFO("[\nX COORDINATE: %f\nY COORDINATE: %f\nORIENTATION: %f\ndt: %f", odom.x, odom.y, odom.theta, dt);
+    
+    // publishing and broadcasting
+    nav_msgs::Odometry odometry = populateOdometry();
+    publisher.publish(odometry);
+
+    geometry_msgs::TransformStamped transform = populateTransform();
+    broadcaster.sendTransform(transform);
 }
 
 
@@ -122,6 +170,10 @@ int main(int argc, char *argv[])
     dynamic_reconfigure::Server<odometry::parametersConfig> config_server;
     config_server.setCallback(boost::bind(&configChangeCallback, _1, _2));
 
+    // ### BEGIN ### output data publisher and broadcaster
+    tf::TransformBroadcaster odometry_broadcaster;
+    ros::Publisher odometry_publisher = nh.advertise<nav_msgs::Odometry>("odometry", 50);
+
     // ### BEGIN ### wheels data subscriber and synchronizer
     std::cout << "Node started...\n";
     message_filters::Subscriber<odometry::floatStamped> left_speed_sub(nh, SPEED_L_TOPIC, 1);
@@ -133,9 +185,8 @@ int main(int argc, char *argv[])
     std::cout << "Subscribers built...\n";
     message_filters::Synchronizer<syncPolicy> sync(syncPolicy(10), left_speed_sub, right_speed_sub, steer_sub);
     std::cout << "Synchronizer started...\n";
-    sync.registerCallback(boost::bind(&subCallback, _1, _2, _3));
+    sync.registerCallback(boost::bind(&subCallback, _1, _2, _3, odometry_broadcaster, odometry_publisher));
     std::cout << "Topics synchronized...\n";
-
     // ### END ###
 
     ros::spin();

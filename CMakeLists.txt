@@ -44,6 +44,10 @@ find_package(catkin REQUIRED COMPONENTS
 
   dynamic_reconfigure
 
+  tf
+
+  nav_msgs
+
 )
 ##   * add "message_runtime" and every package in MSG_DEP_SET to
 ##     catkin_package(CATKIN_DEPENDS ...)
@@ -77,6 +81,7 @@ add_message_files(FILES
 
 generate_messages(DEPENDENCIES
   std_msgs
+  nav_msgs
 )
 
 ################################################
