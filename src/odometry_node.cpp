@@ -1,4 +1,7 @@
+#include<math.h>
+
 #include "ros/ros.h"
+#include "ros/duration.h"
 
 #include <message_filters/subscriber.h>
 #include <message_filters/sync_policies/approximate_time.h>
@@ -11,18 +14,74 @@
 //#include "custom_messages/floatStamped.h"
 #include "odometry/floatStamped.h"
 
-#include "rosbag/bag.h"
+#define BASELINE 0.130
+#define CAR_LENGTH 0.1765
+#define STEERING_FACTOR 18
+#define PI 3.14159265
+
+
+
+typedef struct odometry_data{
+    double x;
+    double y;
+    double theta;
+}  OdometryData;
+
+typedef struct diff_drive_control_variables{
+    double speed_left;
+    double speed_right; 
+} DiffDriveControlVariables;
+
+
+void differenrialDriveOdometry(double dt, double speed_L, double speed_R, OdometryData startingPose, OdometryData* storageStruct){
+    double linear_velocity = (speed_R + speed_L) / 2;
+    double angular_velocity = (speed_R - speed_L) / BASELINE;
+    storageStruct->theta = startingPose.theta + angular_velocity * dt;
+    if (angular_velocity > 0.0001)  //exact integration assuming velocities constamìnt in the time lapse
+    {
+        storageStruct->x = startingPose.x + (linear_velocity / angular_velocity) * (sin(storageStruct->theta * (360/PI)) - sin(startingPose.theta * (360/PI)));
+        storageStruct->y = startingPose.y - (linear_velocity / angular_velocity) * (cos(storageStruct->theta * (360/PI)) - sin(startingPose.theta * (360/PI)));
+    }
+    else  //for low values of omega I use the Ruge-Kutta approximation
+    {
+        storageStruct->x = startingPose.x + linear_velocity * dt * cos(startingPose.theta + (angular_velocity * dt) / 2);
+        storageStruct->y = startingPose.y + linear_velocity * dt * sin(startingPose.theta + (angular_velocity * dt) / 2);
+    }
+}
+
+void ackermanDriveOdometry(double dt, double speed_L, double speed_R, double steer, OdometryData startingPose, OdometryData* storageStruct){
+    double linear_velocity = (speed_R + speed_L) / 2;
+    double angular_velocity = angular_velocity * tan(steer / STEERING_FACTOR) / CAR_LENGTH;
+    storageStruct->theta = startingPose.theta + angular_velocity * dt;
+    if (angular_velocity > 0.0001)  //exact integration assuming velocities constamìnt in the time lapse
+    {
+        storageStruct->x = startingPose.x + (linear_velocity / angular_velocity) * (sin(storageStruct->theta * (360/PI)) - sin(startingPose.theta * (360/PI)));
+        storageStruct->y = startingPose.y - (linear_velocity / angular_velocity) * (cos(storageStruct->theta * (360/PI)) - sin(startingPose.theta * (360/PI)));
+    }
+    else  //for low values of omega I use the Ruge-Kutta approximation
+    {
+        storageStruct->x = startingPose.x + linear_velocity * dt * cos(startingPose.theta + (angular_velocity * dt) / 2);
+        storageStruct->y = startingPose.y + linear_velocity * dt * sin(startingPose.theta + (angular_velocity * dt) / 2);
+    }
+}
 
 
 void subCallback(const odometry::floatStamped::ConstPtr& left,
                  const odometry::floatStamped::ConstPtr& right, 
                  const odometry::floatStamped::ConstPtr& steer){
+    
     ROS_INFO("{MESSAGE-NUMBER:: %d}(L: %f4 - R: %f4 - S: %f4)", left->header.seq, left->data, right->data, steer->data);
 }
 
 
 int main(int argc, char *argv[])
 {
+    OdometryData odometry;
+    odometry.x = 0;
+    odometry.y = 0;
+    odometry.theta = 0;
+    double last_msg_time = 0.0;
+
     ros::init(argc, argv, "od_node");
     ros::NodeHandle nh;
     std::cout << "Node started...\n";
