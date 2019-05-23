@@ -60,38 +60,42 @@ void differenrialDriveOdometry(double dt, double speed_L, double speed_R, Odomet
     if (storageStruct->theta > 2*PI)
     {
         storageStruct->theta -= 2*PI;
+    }else if (storageStruct->theta < 0){
+        storageStruct->theta += 2*PI;
     }
     
-    if (angular_velocity > 0.0001)  //exact integration assuming velocities constamìnt in the time lapse
+    /*  if (angular_velocity > 0.0001)  //exact integration assuming velocities constamìnt in the time lapse
     {
         storageStruct->x = startingPose.x + (linear_velocity / angular_velocity) * (sin(storageStruct->theta * (180/PI)) - sin(startingPose.theta * (180/PI)));
         storageStruct->y = startingPose.y - (linear_velocity / angular_velocity) * (cos(storageStruct->theta * (180/PI)) - sin(startingPose.theta * (180/PI)));
-    }
-    else  //for low values of omega I use the Ruge-Kutta approximation
-    {
+    }*/
+ //   else  //for low values of omega I use the Ruge-Kutta approximation
+ //   {
         storageStruct->x = startingPose.x + linear_velocity * dt * cos(startingPose.theta + (angular_velocity * dt) / 2);
         storageStruct->y = startingPose.y + linear_velocity * dt * sin(startingPose.theta + (angular_velocity * dt) / 2);
-    }
+//    }
 }
 
 void ackermanDriveOdometry(double dt, double speed_L, double speed_R, double steer, OdometryData startingPose, OdometryData* storageStruct){
     double linear_velocity = (speed_R + speed_L) / 2;
-    double angular_velocity = angular_velocity * tan(steer / STEERING_FACTOR) / CAR_LENGTH;
+    double angular_velocity = linear_velocity * tan(steer / STEERING_FACTOR) / CAR_LENGTH;
     storageStruct->theta = startingPose.theta + angular_velocity * dt;
     if (storageStruct->theta > 2*PI)
     {
         storageStruct->theta -= 2*PI;
+    }else if (storageStruct->theta < 0){
+        storageStruct->theta += 2*PI;
     }
-    if (angular_velocity > 0.0001)  //exact integration assuming velocities constamìnt in the time lapse
+  /*  if (angular_velocity > 0.0001)  //exact integration assuming velocities constamìnt in the time lapse
     {
         storageStruct->x = startingPose.x + (linear_velocity / angular_velocity) * (sin(storageStruct->theta * (180/PI)) - sin(startingPose.theta * (180/PI)));
         storageStruct->y = startingPose.y - (linear_velocity / angular_velocity) * (cos(storageStruct->theta * (180/PI)) - sin(startingPose.theta * (180/PI)));
-    }
-    else  //for low values of omega I use the Ruge-Kutta approximation
-    {
+    }*/
+ //   else  //for low values of omega I use the Ruge-Kutta approximation
+ //   {
         storageStruct->x = startingPose.x + linear_velocity * dt * cos(startingPose.theta + (angular_velocity * dt) / 2);
         storageStruct->y = startingPose.y + linear_velocity * dt * sin(startingPose.theta + (angular_velocity * dt) / 2);
-    }
+//    }
 }
 
 nav_msgs::Odometry populateOdometry() {
@@ -141,8 +145,12 @@ void subCallback(const odometry::floatStamped::ConstPtr& left,
     last_msg_time = time;
     OdometryData storageStruct;
     differenrialDriveOdometry(dt, left->data, right->data, odom, &storageStruct);
+    double deltax = storageStruct.x-odom.x;
+    double deltay = storageStruct.y-odom.y;
+    double speed = (right->data + left->data) / 2; 
     odom = storageStruct;
-    ROS_INFO("[\nX COORDINATE: %f\nY COORDINATE: %f\nORIENTATION: %f\ndt: %f", odom.x, odom.y, odom.theta, dt);
+
+    ROS_INFO("[\nX COORDINATE: %f\nY COORDINATE: %f\nORIENTATION: %f\ndt: %f\nSPEED: %f\nDELTA: %f   %f", odom.x, odom.y, odom.theta * 360/ (2*PI), dt, speed, deltax, deltay);
     
     // publishing and broadcasting
     nav_msgs::Odometry odometry = populateOdometry();
