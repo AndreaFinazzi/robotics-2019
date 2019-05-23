@@ -9,7 +9,8 @@
 #include <message_filters/connection.h>
 #include <boost/bind.hpp>
 
-
+#include <dynamic_reconfigure/server.h>
+#include <odometry/parametersConfig.h>
 
 //#include "custom_messages/floatStamped.h"
 #include "odometry/floatStamped.h"
@@ -24,7 +25,6 @@
 #define STEER_TOPIC "steer_stamped"
 
 
-
 typedef struct odometry_data{
     double x;
     double y;
@@ -36,6 +36,10 @@ typedef struct diff_drive_control_variables{
     double speed_right; 
 } DiffDriveControlVariables;
 
+void configChangeCallback(odometry::parametersConfig& config, uint32_t level) {
+    ROS_INFO("Reconfigure Request: %s",
+            config.odometry_model_mode?"True":"False");
+}
 
 void differenrialDriveOdometry(double dt, double speed_L, double speed_R, OdometryData startingPose, OdometryData* storageStruct){
     double linear_velocity = (speed_R + speed_L) / 2;
@@ -80,6 +84,7 @@ void subCallback(const odometry::floatStamped::ConstPtr& left,
 int main(int argc, char *argv[])
 {
 
+    //Odometry config variables
     OdometryData odometry;
     odometry.x = 0;
     odometry.y = 0;
@@ -87,8 +92,13 @@ int main(int argc, char *argv[])
     double last_msg_time = 0.0;
 
     ros::init(argc, argv, "odometry_node");
-
     ros::NodeHandle nh;
+
+    // Config server init
+    dynamic_reconfigure::Server<odometry::parametersConfig> config_server;
+    config_server.setCallback(boost::bind(&configChangeCallback, _1, _2));
+
+    // ### BEGIN ### wheels data subscriber and synchronizer
     std::cout << "Node started...\n";
     message_filters::Subscriber<odometry::floatStamped> left_speed_sub(nh, SPEED_L_TOPIC, 1);
     message_filters::Subscriber<odometry::floatStamped> right_speed_sub(nh, SPEED_R_TOPIC, 1);
@@ -102,6 +112,7 @@ int main(int argc, char *argv[])
     sync.registerCallback(boost::bind(&subCallback, _1, _2, _3));
     std::cout << "Topics synchronized...\n";
 
+    // ### END ###
 
     ros::spin();
     return 0;

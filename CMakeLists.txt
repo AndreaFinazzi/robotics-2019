@@ -7,7 +7,7 @@ project(odometry)
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
-find_package(catkin REQUIRED COMPONENTS roscpp message_generation message_filters)
+# find_package(catkin REQUIRED COMPONENTS roscpp message_generation message_filters)
 #  custom_messages
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -41,6 +41,8 @@ find_package(catkin REQUIRED COMPONENTS
   message_generation
 
   message_filters
+
+  dynamic_reconfigure
 
 )
 ##   * add "message_runtime" and every package in MSG_DEP_SET to
@@ -92,10 +94,9 @@ generate_messages(DEPENDENCIES
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
+generate_dynamic_reconfigure_options(
+   cfg/parameters.cfg
+)
 
 ###################################
 ## catkin specific configuration ##
@@ -111,6 +112,7 @@ catkin_package(
   CATKIN_DEPENDS
   message_runtime
   message_filters
+#  dynamic_reconfigure
 #  INCLUDE_DIRS include
 #  LIBRARIES odometry
 #  CATKIN_DEPENDS other_catkin_pkg
@@ -210,7 +212,7 @@ include_directories(
 add_executable(odometry_node
   src/odometry_node.cpp
 )
-add_dependencies(odometry_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(odometry_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS} ${PROJECT_NAME}_gencfg)
 target_link_libraries(odometry_node
   ${catkin_LIBRARIES}
 )
