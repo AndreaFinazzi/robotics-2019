@@ -24,6 +24,16 @@
 #define STEERING_FACTOR 18
 #define PI 3.14159265
 
+#define DEFAULT_INIT_POSITION_X 0.0
+#define DEFAULT_INIT_POSITION_Y 0.0
+#define DEFAULT_INIT_POSITION_THETA 0.0
+#define DEFAULT_INIT_VELOCITY_X 0.0
+#define DEFAULT_INIT_VELOCITY_Y 0.0
+#define DEFAULT_INIT_VELOCITY_ANGULAR 0.0
+
+#define DIFFERENTIAL_MODEL_MODE true
+#define ACKERMAN_MODEL_MODE false
+
 #define SPEED_L_TOPIC "speedL_stamped"
 #define SPEED_R_TOPIC "speedR_stamped"
 #define STEER_TOPIC "steer_stamped"
@@ -32,7 +42,7 @@
 #define ODOMETRY_FRAME_ID "odometry"
 #define CHILD_FRAME_ID "base_link"
 
-typedef struct last_odometry_data{
+typedef struct last_odometry_data {
     double x;
     double y;
     double theta;
@@ -47,14 +57,32 @@ typedef struct diff_drive_control_variables{
     double speed_right; 
 } DiffDriveControlVariables;
 
-
 using namespace std;
+
+odometry::parametersConfig last_config;
 OdometryData last_odometry_data;
 double last_msg_time;
 
+void resetDefaultPosition() {
+    last_odometry_data.x = DEFAULT_INIT_POSITION_X;
+    last_odometry_data.y = DEFAULT_INIT_POSITION_Y;
+}
+
 void configChangeCallback(odometry::parametersConfig& config, uint32_t level) {
-    ROS_INFO("Reconfigure Request: %s",
-            config.odometry_model_mode?"True":"False");
+    ROS_INFO("Reconfigure Request:\nodometry_model_mode: %s\nodometry_reset_default: %s\nodometry_set_position: %s\nodometry_x_position: %f\nodometry_y_position: %f",
+          config.odometry_model_mode?"True":"False",
+          config.odometry_reset_default?"True":"False",
+          config.odometry_set_position?"True":"False",
+          config.odometry_x_position,
+          config.odometry_y_position);
+    if (config.odometry_model_mode != last_config.odometry_model_mode)
+        last_config.odometry_model_mode = config.odometry_model_mode;
+    if (config.odometry_set_position) {
+        last_odometry_data.x = config.odometry_x_position;
+        last_odometry_data.y = config.odometry_y_position;
+    }
+    else if (config.odometry_reset_default)
+        resetDefaultPosition();
 }
 
 void differenrialDriveOdometry(double delta_time, double speed_L, double speed_R, OdometryData& new_odometry_data){
@@ -75,41 +103,31 @@ void differenrialDriveOdometry(double delta_time, double speed_L, double speed_R
 
     }
     
-    /*  if (angular_velocity > 0.0001)  //exact integration assuming velocities constamìnt in the time lapse
-    {
-        new_odometry_data->x = startingPose.x + (linear_velocity / angular_velocity) * (sin(new_odometry_data->theta * (180/PI)) - sin(startingPose.theta * (180/PI)));
-        new_odometry_data->y = startingPose.y - (linear_velocity / angular_velocity) * (cos(new_odometry_data->theta * (180/PI)) - sin(startingPose.theta * (180/PI)));
-    }*/
-//   else  //for low values of omega I use the Ruge-Kutta approximation
-//   {
      new_odometry_data.linear_velocity_x = linear_velocity * cos(last_odometry_data.theta + (delta_theta / 2));
      new_odometry_data.linear_velocity_y = linear_velocity * sin(last_odometry_data.theta + (delta_theta / 2));
      new_odometry_data.x = last_odometry_data.x + (new_odometry_data.linear_velocity_x * delta_time);
      new_odometry_data.y = last_odometry_data.y + (new_odometry_data.linear_velocity_y * delta_time);
-//    }
+
 }
 
-void ackermanDriveOdometry(double delta_time, double speed_L, double speed_R, double steer, OdometryData startingPose, OdometryData* new_odometry_data){
+void ackermanDriveOdometry(double delta_time, double speed_L, double speed_R, double steer, OdometryData& new_odometry_data){
     double linear_velocity = (speed_R + speed_L) / 2;
-    double angular_velocity = linear_velocity * tan(steer / STEERING_FACTOR) / CAR_LENGTH;
-    double delta_theta = angular_velocity * delta_time;
-    new_odometry_data->theta = startingPose.theta + delta_theta;
-    if (new_odometry_data->theta > 2*PI)
+    last_odometry_data.angular_velocity = linear_velocity * tan(steer / STEERING_FACTOR) / CAR_LENGTH;
+    double delta_theta = last_odometry_data.angular_velocity * delta_time;
+    new_odometry_data.theta = last_odometry_data.theta + delta_theta;
+    
+    if (new_odometry_data.theta > 2*PI)
     {
-        new_odometry_data->theta -= 2*PI;
-    }else if (new_odometry_data->theta < 0){
-        new_odometry_data->theta += 2*PI;
+        new_odometry_data.theta -= 2*PI;
+    } else if (new_odometry_data.theta < 0) {
+        new_odometry_data.theta += 2*PI;
     }
- /*  if (angular_velocity > 0.0001)  //exact integration assuming velocities constamìnt in the time lapse
-    {
-        new_odometry_data->x = startingPose.x + (linear_velocity / angular_velocity) * (sin(new_odometry_data->theta * (180/PI)) - sin(startingPose.theta * (180/PI)));
-        new_odometry_data->y = startingPose.y - (linear_velocity / angular_velocity) * (cos(new_odometry_data->theta * (180/PI)) - sin(startingPose.theta * (180/PI)));
-    }*/
-//   else  //for low values of omega I use the Ruge-Kutta approximation
-//   {
-        new_odometry_data->x = startingPose.x + linear_velocity * delta_time * cos(startingPose.theta + (delta_theta / 2));
-        new_odometry_data->y = startingPose.y + linear_velocity * delta_time * sin(startingPose.theta + (delta_theta / 2));
-//    }
+
+    new_odometry_data.linear_velocity_x = linear_velocity * cos(last_odometry_data.theta + (delta_theta / 2));
+    new_odometry_data.linear_velocity_y = linear_velocity * sin(last_odometry_data.theta + (delta_theta / 2));
+    new_odometry_data.x = last_odometry_data.x + (new_odometry_data.linear_velocity_x * delta_time);
+    new_odometry_data.y = last_odometry_data.y + (new_odometry_data.linear_velocity_y * delta_time);
+
 }
 
 nav_msgs::Odometry populateOdometry() {
@@ -160,7 +178,14 @@ void subCallback(const odometry::floatStamped::ConstPtr& left,
     last_msg_time = time;
 
     OdometryData new_odometry_data;
-    differenrialDriveOdometry(delta_time, left->data, right->data, new_odometry_data);
+    if (last_config.odometry_model_mode == DIFFERENTIAL_MODEL_MODE) {
+        differenrialDriveOdometry(delta_time, left->data, right->data, new_odometry_data);
+    } else if (last_config.odometry_model_mode == ACKERMAN_MODEL_MODE) {
+        ackermanDriveOdometry(delta_time, left->data, right->data, steer->data, new_odometry_data);
+    } else {
+        ROS_INFO("!!!!!!!!!!! CRITICAL CONFIG ERROR - ODOMETRY MODEL NOT SET!!!!!!!!!!!");
+    }
+    
 
     double deltax = new_odometry_data.x - last_odometry_data.x;
     double deltay = new_odometry_data.y - last_odometry_data.y;
@@ -184,6 +209,13 @@ int main(int argc, char *argv[])
 
     ros::init(argc, argv, "odometry_node");
     ros::NodeHandle nh;
+
+    // init support structure
+    resetDefaultPosition();
+    last_odometry_data.theta = DEFAULT_INIT_POSITION_THETA;
+    last_odometry_data.linear_velocity_x = DEFAULT_INIT_VELOCITY_X;
+    last_odometry_data.linear_velocity_y = DEFAULT_INIT_VELOCITY_Y;
+    last_odometry_data.angular_velocity = DEFAULT_INIT_VELOCITY_ANGULAR;
 
     // Config server init
     dynamic_reconfigure::Server<odometry::parametersConfig> config_server;
