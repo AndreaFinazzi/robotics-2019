@@ -86,48 +86,67 @@ void configChangeCallback(odometry::parametersConfig& config, uint32_t level) {
 }
 
 void differenrialDriveOdometry(double delta_time, double speed_L, double speed_R, OdometryData& new_odometry_data){
-    new_odometry_data.angular_velocity = (speed_R - speed_L) / BASELINE;
     
     double linear_velocity = (speed_R + speed_L) / 2;
+    double angular_velocity = (speed_R - speed_L) / BASELINE;
     
-    double delta_theta = new_odometry_data.angular_velocity * delta_time;
+    double delta_theta = angular_velocity * delta_time;
+    
+    
+    new_odometry_data.angular_velocity = angular_velocity;
     new_odometry_data.theta = last_odometry_data.theta + delta_theta;
+    
     
     if (new_odometry_data.theta > 2*PI) {
-
         new_odometry_data.theta -= 2*PI;
-
     } else if (new_odometry_data.theta < 0) {
-
         new_odometry_data.theta += 2*PI;
-
     }
-    
-     new_odometry_data.linear_velocity_x = linear_velocity * cos(last_odometry_data.theta + (delta_theta / 2));
-     new_odometry_data.linear_velocity_y = linear_velocity * sin(last_odometry_data.theta + (delta_theta / 2));
-     new_odometry_data.x = last_odometry_data.x + (new_odometry_data.linear_velocity_x * delta_time);
-     new_odometry_data.y = last_odometry_data.y + (new_odometry_data.linear_velocity_y * delta_time);
 
-}
-
-void ackermanDriveOdometry(double delta_time, double speed_L, double speed_R, double steer, OdometryData& new_odometry_data){
-    double linear_velocity = (speed_R + speed_L) / 2;
-    last_odometry_data.angular_velocity = linear_velocity * tan(steer / STEERING_FACTOR) / CAR_LENGTH;
-    double delta_theta = last_odometry_data.angular_velocity * delta_time;
-    new_odometry_data.theta = last_odometry_data.theta + delta_theta;
-    
-    if (new_odometry_data.theta > 2*PI)
+    if (angular_velocity > 0.0001)  //exact integration assuming velocities constamìnt in the time lapse
     {
-        new_odometry_data.theta -= 2*PI;
-    } else if (new_odometry_data.theta < 0) {
-        new_odometry_data.theta += 2*PI;
+        new_odometry_data.x = last_odometry_data.x + (linear_velocity / angular_velocity) * (sin(new_odometry_data.theta) - sin(last_odometry_data.theta));
+        new_odometry_data.y = last_odometry_data.y - (linear_velocity / angular_velocity) * (cos(new_odometry_data.theta) - cos(last_odometry_data.theta));
+    } else {
+        new_odometry_data.x = last_odometry_data.x + (new_odometry_data.linear_velocity_x * delta_time);
+        new_odometry_data.y = last_odometry_data.y + (new_odometry_data.linear_velocity_y * delta_time);
     }
 
     new_odometry_data.linear_velocity_x = linear_velocity * cos(last_odometry_data.theta + (delta_theta / 2));
     new_odometry_data.linear_velocity_y = linear_velocity * sin(last_odometry_data.theta + (delta_theta / 2));
-    new_odometry_data.x = last_odometry_data.x + (new_odometry_data.linear_velocity_x * delta_time);
-    new_odometry_data.y = last_odometry_data.y + (new_odometry_data.linear_velocity_y * delta_time);
 
+}
+
+
+void ackermanDriveOdometry(double delta_time, double speed_L, double speed_R, double steer, OdometryData& new_odometry_data){
+    
+    double linear_velocity = (speed_R + speed_L) / 2;
+    double angular_velocity = linear_velocity * tan((steer / STEERING_FACTOR) * (PI / 180)) / CAR_LENGTH;
+    
+    double delta_theta = angular_velocity * delta_time;
+    
+    new_odometry_data.theta = last_odometry_data.theta + delta_theta;
+    
+    
+    if (new_odometry_data.theta > 2*PI) {
+        new_odometry_data.theta -= 2*PI;
+    } else if (new_odometry_data.theta < 0) {
+        new_odometry_data.theta += 2*PI;
+    }
+
+
+    if (angular_velocity > 0.0001)  //exact integration assuming velocities constamìnt in the time lapse
+    {
+        new_odometry_data.x = last_odometry_data.x + (linear_velocity / angular_velocity) * (sin(new_odometry_data.theta) - sin(last_odometry_data.theta));
+        new_odometry_data.y = last_odometry_data.y - (linear_velocity / angular_velocity) * (cos(new_odometry_data.theta) - cos(last_odometry_data.theta));
+    }
+    else  //for low values of omega I use the Ruge-Kutta approximation
+    {
+        new_odometry_data.x = last_odometry_data.x + linear_velocity * delta_time * cos(last_odometry_data.theta + delta_theta / 2);
+        new_odometry_data.y = last_odometry_data.y + linear_velocity * delta_time * sin(last_odometry_data.theta + delta_theta / 2);
+    }
+    new_odometry_data.linear_velocity_x = linear_velocity * cos(new_odometry_data.theta);
+    new_odometry_data.linear_velocity_y = linear_velocity * sin(new_odometry_data.theta);
 }
 
 nav_msgs::Odometry populateOdometry() {
