@@ -69,20 +69,18 @@ void resetDefaultPosition() {
 }
 
 void configChangeCallback(odometry::parametersConfig& config, uint32_t level) {
-    ROS_INFO("Reconfigure Request:\nodometry_model_mode: %s\nodometry_reset_default: %s\nodometry_set_position: %s\nodometry_x_position: %f\nodometry_y_position: %f",
-          config.odometry_model_mode?"True":"False",
-          config.odometry_reset_default?"True":"False",
-          config.odometry_set_position?"True":"False",
-          config.odometry_x_position,
-          config.odometry_y_position);
+    
     if (config.odometry_model_mode != last_config.odometry_model_mode)
+        ROS_INFO("Configuration changed: changing odometry model to: \t%s", config.odometry_model_mode?"Differential":"Ackerman");
         last_config.odometry_model_mode = config.odometry_model_mode;
     if (config.odometry_set_position) {
+        ROS_INFO("Configuration changed: setting position to: \t[X: %f, Y: %f]", config.odometry_x_position, config.odometry_y_position);        
         last_odometry_data.x = config.odometry_x_position;
         last_odometry_data.y = config.odometry_y_position;
-    }
-    else if (config.odometry_reset_default)
+    } else if (config.odometry_reset_default) {
+        ROS_INFO("Configuration changed: setting position to default: \t[X: %f, Y: %f]", DEFAULT_INIT_POSITION_X, DEFAULT_INIT_POSITION_Y);        
         resetDefaultPosition();
+    }
 }
 
 void differenrialDriveOdometry(double delta_time, double speed_L, double speed_R, OdometryData& new_odometry_data){
